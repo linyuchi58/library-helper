@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><title>借書小幫手：數字鍵盤操作卡</title>
+<style>
+@page{size:A4;margin:12mm}
+body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;color:#222;margin:0;padding:16px}
+h1{font-size:26px;margin:0 0 4px;color:#1d5f8f}.sub{color:#666;margin:0 0 16px}
+.wrap{display:flex;gap:28px;align-items:flex-start}
+.pad{display:grid;grid-template-columns:repeat(4,92px);grid-template-rows:repeat(5,92px);gap:8px}
+.k{border:2px solid #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#fafafa}
+.k b{font-size:28px;font-family:Consolas,monospace}.k span{font-size:15px;font-weight:bold;margin-top:4px}
+.f{background:#fff200}.e{background:#d8ecfa}
+.plus{grid-column:4;grid-row:2/4}.ent{grid-column:4;grid-row:4/6}.zero{grid-column:1/3}
+table{border-collapse:collapse;font-size:17px}td{border:1px solid #bbb;padding:8px 12px;vertical-align:top}td:first-child{font-weight:bold;white-space:nowrap;background:#f3f6f9}
+.tip{margin-top:18px;font-size:15px;line-height:1.7;background:#fff8d6;border-radius:8px;padding:10px 14px}
+</style></head><body>
+<h1>📚 借書小幫手：數字鍵盤操作卡</h1>
+<p class="sub">請確認 NumLock 燈亮著（沒亮也能用，小幫手會自動處理）</p>
+<div class="wrap">
+<div class="pad">
+  <div class="k"><b>Num</b><span>（保持開啟）</span></div>
+  <div class="k f"><b>/</b><span>選班級</span></div>
+  <div class="k f"><b>*</b><span>書籍欄<br>（還書）</span></div>
+  <div class="k f"><b>−</b><span>下課模式⇄<br>回班級</span></div>
+  <div class="k"><b>7</b></div><div class="k"><b>8</b></div><div class="k"><b>9</b></div>
+  <div class="k f plus"><b>+</b><span>下一位</span></div>
+  <div class="k"><b>4</b></div><div class="k"><b>5</b></div><div class="k"><b>6</b></div>
+  <div class="k"><b>1</b></div><div class="k"><b>2</b></div><div class="k"><b>3</b></div>
+  <div class="k e ent"><b>Enter</b><span>確定<br><small style="font-weight:normal;font-size:12px">書籍欄空白時<br>＝回讀者欄借書</small></span></div>
+  <div class="k zero"><b>0</b></div>
+  <div class="k f"><b>.</b><span>書籍欄<br>（還書）</span></div>
+</div>
+<table>
+<tr><td>下課借書</td><td>輸入<b>胸號</b> → Enter → 看大字、聽姓名 → 掃書</td></tr>
+<tr><td>班級借書</td><td><b>/</b> 輸入班級代碼（例 <b>203</b>＝二年丙班）→ Enter<br>之後只要輸入<b>座號</b> → Enter</td></tr>
+<tr><td>回到下課模式</td><td>按 <b>−</b>（再按一次回到剛剛的班級）<br>或 <b>/</b> 直接 Enter</td></tr>
+<tr><td>換下一位</td><td>直接輸入下一位的號碼即可；要清除重來按 <b>+</b></td></tr>
+<tr><td>還完書要借書</td><td>書籍欄空白時直接按 <b>Enter</b>，回到讀者證號欄並唸「借書」</td></tr>
+<tr><td>還書</td><td>按 <b>.</b> 或 <b>*</b> 跳到書籍欄 → 一本一本掃<br>按 <b>/ − +</b> 會自動回到讀者證號欄</td></tr>
+<tr><td>借滿</td><td>「連續借書」模式：游標自動回讀者欄，直接輸入下一位<br>「借還書」模式：游標留在書籍欄，可直接還書</td></tr>
+<tr><td>大字變紅色</td><td><b>先不要掃書！</b>系統上的讀者不是這位學生，請重新輸入胸號</td></tr>
+</table>
+</div>
+<div class="tip">💡 大字區顯示的班級和姓名，請跟學生本人確認後再掃書。</div>
+</body></html>

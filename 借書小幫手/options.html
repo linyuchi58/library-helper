@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<title>借書小幫手：名單與設定</title>
+<style>
+  body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;background:#f3f6f9;color:#222;margin:0}
+  main{max-width:880px;margin:0 auto;padding:24px}
+  h1{color:#1d5f8f;margin:0 0 4px}
+  .lead{color:#666;margin:0 0 20px}
+  section{background:#fff;border-radius:12px;padding:18px 22px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  h2{font-size:19px;margin:0 0 12px;color:#1d5f8f}
+  label{display:block;margin:8px 0}
+  input[type=text],input[type=password],input[type=number],select{font-size:15px;padding:6px 8px;border:1px solid #bbb;border-radius:6px;font-family:inherit}
+  input.wide{width:100%;box-sizing:border-box}
+  button{font-family:inherit;font-size:15px;padding:8px 16px;border-radius:8px;border:1px solid #2b7bb9;background:#2b7bb9;color:#fff;cursor:pointer;margin:4px 6px 4px 0}
+  button.alt{background:#fff;color:#2b7bb9}
+  button:disabled{opacity:.4;cursor:default}
+  table{border-collapse:collapse;width:100%;font-size:14px;margin-top:10px}
+  th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}
+  th{background:#eef4f9}
+  .msg{margin-top:10px;padding:10px 12px;border-radius:8px;white-space:pre-wrap;line-height:1.6}
+  .ok{background:#e9f7ee;color:#1e6b3b}.err{background:#fdecea;color:#a12b1f}.info{background:#eef4f9;color:#1d5f8f}
+  .hint{font-size:13px;color:#777}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  code{background:#f1f1f1;padding:1px 5px;border-radius:4px}
+  details.req{background:#f7fafc;border:1px solid #d6e4ef;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:14px;line-height:1.7}
+  details.req summary{cursor:pointer;font-weight:bold;color:#1d5f8f}
+  details.req ul{margin:2px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>📚 借書小幫手</h1>
+  <p class="lead">名單管理與設定。名單只存在這台電腦的 Chrome 裡；有設定雲端試算表時，也可以上傳／下載。</p>
+  <div class="msg" style="background:#fff4d6;color:#8a5a00;border:2px solid #e0b000;font-weight:bold;margin-bottom:18px">
+    🔄 變更名單或設定後，請到「借還書頁面」按 <kbd style="border:1px solid #8a5a00;border-radius:4px;padding:0 6px">F5</kbd> 重新整理，才會確實生效。
+    <div style="font-weight:normal;font-size:13px;margin-top:4px">（在 chrome://extensions 更新或重新載入小幫手後，也一定要按 F5。）</div>
+  </div>
+
+  <section>
+    <h2>目前名單</h2>
+    <div id="cur" class="msg info">讀取中…</div>
+    <div class="row" style="margin-top:8px">
+      <input type="text" id="q" placeholder="測試：輸入胸號或學號" style="width:220px">
+      <span id="qr"></span>
+    </div>
+    <button class="alt" id="exportCsv">匯出 CSV（可貼到 Google 試算表）</button>
+  </section>
+
+  <section>
+    <h2>① 匯入學務系統名冊</h2>
+    <details class="req" open>
+      <summary>名冊需要哪些欄位？（各校通用）</summary>
+      <p>第一列是標題列，欄位順序不拘，名稱含下列文字即可自動辨認：</p>
+      <ol>
+        <li><b>姓名</b>（必要）</li>
+        <li><b>讀者證號</b>（必要，依貴校圖書系統設定）
+          <ul>
+            <li>用學號：欄位「學號」（若借書證號另有編號，標題用「借書證號」或「讀者證號」會優先採用）</li>
+            <li>用身分證字號：欄位「身分證字號」（或「身分證統一編號」），並在 ③ 設定選「身分證字號」</li>
+          </ul></li>
+        <li><b>班級與座號</b>（必要，以下任一組）
+          <ul>
+            <li>年級 ＋ 班序 ＋ 座號</li>
+            <li>班級座號（5 碼，例 20313）</li>
+            <li>班級代碼（例 203）＋ 座號</li>
+            <li>班級名稱（例「二年丙班」「2年3班」）＋ 座號</li>
+          </ul>
+          班名不是甲乙丙或數字（例如忠、孝、仁、愛）時，一定要附「班序」或「班級代碼」。</li>
+        <li><b>胸號</b>（選填）：貴校胸號規則特殊時，直接提供這欄最準。</li>
+      </ol>
+      <p class="hint">臺中市雲端學務系統的「學生名冊」勾選 學號、姓名、班級（數字）、座號 匯出即可。其他系統只要欄位符合上述任一組即可。</p>
+      <button class="alt" id="tplCsv">下載空白範本（CSV）</button>
+    </details>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    <label>胸號規則：
+      <select id="importRule">
+        <option value="auto">自動（名冊有「胸號」欄就用它；否則任一年級超過 9 班用 5 碼，其餘 4 碼）</option>
+        <option value="GCSS">4 碼：年級 ＋ 班序 1 碼 ＋ 座號 2 碼（例 2313）</option>
+        <option value="GCCSS">5 碼：年級 ＋ 班序 2 碼 ＋ 座號 2 碼（例 20313，同「班級座號」）</option>
+        <option value="col">直接使用名冊裡的「胸號」欄</option>
+        <option value="custom">自訂格式…</option>
+      </select>
+    </label>
+    <label id="tplBox" style="display:none">自訂格式：<input type="text" id="customTpl" style="width:140px" placeholder="例：GCSS">
+      <span class="hint">G＝年級，GG＝年級補成 2 碼；C＝班序，CC＝班序補成 2 碼；S＝座號，SS＝座號補成 2 碼。例：GCCSS → 20313</span></label>
+    <div id="impMsg"></div>
+    <div id="preview"></div>
+    <button id="save" disabled>儲存到這台電腦</button>
+    <button id="saveUp" class="alt" disabled>儲存並上傳到雲端試算表</button>
+  </section>
+
+  <section>
+    <h2>② 雲端試算表（選用）</h2>
+    <p class="hint">在 Google 試算表安裝本工具附的 Apps Script 並部署成網頁應用程式後，把網址和密語填在這裡。各台借書電腦就能從同一份試算表更新名單。</p>
+    <label>網頁應用程式網址<input type="text" id="cloudUrl" class="wide" placeholder="https://script.google.com/macros/s/……/exec"></label>
+    <label>密語（與 Apps Script 指令碼屬性 TOKEN 相同）<input type="password" id="cloudToken" class="wide"></label>
+    <label>自動更新：每
+      <input type="number" id="autoSyncHours" min="0" max="168" style="width:70px"> 小時從雲端抓一次（0 = 不自動）</label>
+    <button id="down">立即從雲端下載名單</button>
+    <button id="up" class="alt">把目前名單上傳到雲端</button>
+    <div id="cloudMsg"></div>
+  </section>
+
+  <section>
+    <h2>③ 操作設定</h2>
+    <label><b>系統的讀者證號使用：</b>
+      <select id="readerIdType">
+        <option value="pid">身分證字號（大寫）</option>
+        <option value="sid">學號</option>
+      </select>
+      <span class="hint">請與圖書系統「系統設定」裡的讀者證號設定一致。</span>
+    </label>
+    <fieldset style="border:1px solid #d6e4ef;border-radius:8px;margin-top:10px">
+      <legend style="color:#1d5f8f;font-weight:bold">大字顯示開關</legend>
+      <label><input type="checkbox" id="showReaderBig"> 黃底大字顯示讀者班級＋姓名，格式：
+        <select id="bigFormat">
+          <option value="short">簡短：5甲王小明</option>
+          <option value="long">完整：5年甲班王小明</option>
+        </select></label>
+      <label><input type="checkbox" id="showReturnBig"> 還書時，黃底大字顯示「【已歸還】書名」</label>
+      <label><input type="checkbox" id="showWarnBig"> 錯誤與「讀者不符」時，紅底大字警示</label>
+      <label><input type="checkbox" id="showIdleHint"> 等待輸入時，顯示「下課模式：請輸入胸號」等提示</label>
+      <label><input type="checkbox" id="showOverdue"> 「預約記錄」下方紅框：列出逾期書名</label>
+      <label><input type="checkbox" id="showQuota"> 「預約記錄」下方綠框：沒有逾期時顯示「還可借 N 本」</label>
+      <p class="hint" style="margin:4px 0 0">「選班級」輸入中的藍色大字一律顯示，方便確認輸入的班級代碼。</p>
+    </fieldset>
+    <fieldset style="border:1px solid #d6e4ef;border-radius:8px;margin-top:10px">
+      <legend style="color:#1d5f8f;font-weight:bold">語音開關</legend>
+      <label><input type="checkbox" id="sayName"> 唸出讀者，內容：
+        <select id="speakMode">
+          <option value="name">只唸姓名</option>
+          <option value="class">唸班級座號＋姓名</option>
+        </select></label>
+      <label><input type="checkbox" id="sayReturn"> 還書時唸出「已歸還，書名」</label>
+      <label><input type="checkbox" id="sayBookKey"> 按 <code>.</code> 或 <code>*</code> 時唸出「還書」</label>
+      <label><input type="checkbox" id="sayNextKey"> 按 <code>+</code> 時唸出「下一位」</label>
+      <label><input type="checkbox" id="sayBorrowKey"> 書籍條碼欄空白時按 <code>Enter</code>（回到讀者證號欄）唸出「借書」</label>
+      <label><input type="checkbox" id="sayFull"> 唸出「已經借滿」</label>
+      <label><input type="checkbox" id="sayOverdue"> 唸出「有 N 本逾期未還：書名」</label>
+      <label><input type="checkbox" id="sayModeSwitch"> 切換連續借書／借還書、下課／班級時唸出</label>
+      <label><input type="checkbox" id="sayWarn"> 唸出錯誤與「讀者不符」警示</label>
+      <label>語速：<input type="number" id="speakRate" min="0.5" max="2" step="0.1" style="width:70px">（1 = 正常）
+        <button class="alt" id="testVoice">試聽</button></label>
+    </fieldset>
+    <label><input type="checkbox" id="acceptClassSeat"> 除了胸號，也接受 5 碼「班級座號」（例 20313）</label>
+    <button id="saveSet">儲存設定</button>
+    <span id="setMsg" class="hint"></span>
+  </section>
+  <section style="text-align:center;background:linear-gradient(135deg,#2b7bb9,#1d5f8f);color:#fff">
+    <div style="font-size:15px;margin-bottom:10px;opacity:.95">借書小幫手由「阿集電腦教室」製作，歡迎分享給其他學校使用</div>
+    <a href="https://sites.google.com/view/linyuchi/" target="_blank" rel="noopener"
+       style="display:inline-block;background:#fff200;color:#1d3a5f;font-size:22px;font-weight:900;padding:14px 34px;border-radius:14px;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25)">
+      🏫 到「阿集電腦教室」查看其它好用工具 →</a>
+    <div style="font-size:12px;margin-top:10px;opacity:.8">版本 <span id="ver"></span>・原始碼與說明：<a href="https://github.com/linyuchi58/library-helper" target="_blank" rel="noopener" style="color:#fff">GitHub</a></div>
+  </section>
+</main>
+<script src="xlsx.full.min.js"></script>
+<script src="common.js"></script>
+<script src="options.js"></script>
+</body>
+</html>
