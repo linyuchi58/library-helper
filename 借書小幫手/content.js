@@ -232,6 +232,8 @@
     const { reader, book } = inputs();
     if (!reader) return;
     if (e.target === reader) {
+      // 借滿時游標會自動回讀者欄：大字區繼續顯示這位學生，看得出是誰借滿
+      if (S.ctx === 'borrow' && S.current && S.current.state === 'ok' && S.current.quota === 0) return;
       if (S.ctx !== 'idle') { S.ctx = 'idle'; S.ret = null; renderBig(); }
     } else if (e.target === book) {
       if (S.ctx === 'idle') { S.ctx = 'return'; S.current = null; renderPanel(); renderBig(); }
@@ -701,7 +703,8 @@
            padding:8px 14px;font-family:"Microsoft JhengHei","PingFang TC",sans-serif;color:#c00;overflow:hidden;line-height:1.35}
         .h{font-weight:900}.i{font-weight:bold;color:#222}.i small{color:#c00;font-weight:bold}
         .o.q{border-color:#27864a;color:#1e6b3b;display:flex;align-items:center;justify-content:center;font-weight:900;white-space:nowrap}
-        .o.q.zero{border-color:#e08a00;color:#b36b00}
+        .o.q.zero{border-color:#e00;animation:lhFull 1s steps(1) infinite}
+        @keyframes lhFull{0%{background:#e00;color:#fff}50%{background:#fff;color:#e00}}
       </style><div class="o" id="o"></div>`;
       document.documentElement.appendChild(odHost);
     }
