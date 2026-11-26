@@ -236,7 +236,8 @@
       if (S.ctx === 'borrow' && S.current && S.current.state === 'ok' && S.current.quota === 0) return;
       if (S.ctx !== 'idle') { S.ctx = 'idle'; S.ret = null; renderBig(); }
     } else if (e.target === book) {
-      if (S.ctx === 'idle') { S.ctx = 'return'; S.current = null; renderPanel(); renderBig(); }
+      // 畫面上已經有讀者（例如直接掃了借書證）就是借書，不是還書
+      if (S.ctx === 'idle') { S.ctx = readPageInfo().name ? 'borrow' : 'return'; S.current = null; renderPanel(); renderBig(); }
     }
   }, true);
 
@@ -591,7 +592,10 @@
     } else if (S.ctx === 'borrow' && S.current) {
       cls = S.current.state === 'ok' ? 'ok' : 'pending'; text = bigText(S.current.st); show = st.showReaderBig && st.bigFormat !== 'off';
     } else if (S.ctx === 'return' && S.ret) { cls = 'ok'; text = null; show = st.showReturnBig; }
-    else if (S.ctx === 'return') { cls = 'retmode'; text = '還書中'; show = st.showReturnMode; }
+    else if (S.ctx === 'return' && !readPageInfo().name && document.activeElement === inputs().book) {
+      // 「還書中」條件：游標在書籍欄，而且系統畫面上沒有讀者姓名
+      cls = 'retmode'; text = '還書中'; show = st.showReturnMode;
+    }
     else if (S.msg && S.ctx !== 'idle') { cls = 'info'; text = S.msg.text; show = true; }
     b.className = 'b ' + cls;
     if (text === null) t.innerHTML = `<span class="rt">【已歸還】</span>${esc(S.ret.title)}`;
@@ -752,7 +756,10 @@
   }
 
   // 單頁式網站：持續偵測借還書頁面，並追蹤表格位置
-  setInterval(() => { ensurePanel(); layoutBig(); updateOverdue(); watchFull(); }, 700);
+  setInterval(() => {
+    ensurePanel(); updateOverdue(); watchFull();
+    if (S.ctx === 'return' && !S.ret) renderBig(); else layoutBig();   // 畫面上讀者出現／消失時，「還書中」跟著更新
+  }, 700);
   load().then(ensurePanel);
   chrome.runtime.sendMessage({ type: 'syncIfStale' }).catch(() => {});
 })();

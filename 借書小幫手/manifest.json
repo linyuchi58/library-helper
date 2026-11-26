@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "借書小幫手",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "全國閱讀推動與圖書管理系統借還書輔助：輸入胸號／座號自動帶入借書證號、唸出姓名、自動切換欄位。",
   "permissions": [
     "storage",
