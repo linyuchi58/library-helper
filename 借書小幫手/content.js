@@ -6,7 +6,7 @@
   const CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
   const DEFAULTS = {
     readerIdType: 'pid', bigFormat: 'short',
-    showReaderBig: true, showReturnBig: true, showWarnBig: true, showIdleHint: true, showOverdue: true, showQuota: true,
+    showReaderBig: true, showReturnBig: true, showWarnBig: true, showReturnMode: true, showOverdue: true, showQuota: true,
     speakMode: 'name', speakRate: 1.1, acceptClassSeat: true, sayFull: true, sayOverdue: true,
     sayName: true, sayReturn: true, sayBookKey: true, sayNextKey: true, sayBorrowKey: true, sayModeSwitch: true, sayWarn: true
   };
@@ -27,7 +27,9 @@
     bySid: new Map(), byPid: new Map(), byChest: new Map(),
     byClass: new Map(),   // "年-班序" -> Map(座號 -> 學生)
     keyLens: new Set(),   // 胸號（含班級座號）的長度
-    bookLens: new Set(),  // 看過的書號長度
+    bookLens: new Set(),  // 系統確認過的書號長度（借出／歸還成功才記）
+    ctx: 'idle',          // idle＝游標在讀者欄等待；borrow＝借書中；return＝還書中
+    swallow: new Set(),   // 已攔下 keydown 的按鍵，連同 keyup 一起攔（系統是用 keyup 處理 Enter）
     classes: [],
     settings: { ...DEFAULTS },
     meta: {},
@@ -73,14 +75,14 @@
   }
 
   async function load() {
-    const d = await chrome.storage.local.get(['students', 'settings', 'meta', 'classMode', 'lastClass', 'bookLens', 'workMode']);
+    const d = await chrome.storage.local.get(['students', 'settings', 'meta', 'classMode', 'lastClass', 'bookLens2', 'workMode']);
     S.workMode = d.workMode || 'continuous';
     S.students = d.students || [];
     S.settings = { ...DEFAULTS, ...(d.settings || {}) };
     S.meta = d.meta || {};
     S.classMode = d.classMode || '';
     S.lastClass = d.lastClass || '';
-    S.bookLens = new Set(d.bookLens || []);
+    S.bookLens = new Set(d.bookLens2 || []);   // 舊版 bookLens 可能記錯，不再沿用
     rebuild();
   }
 
@@ -162,7 +164,7 @@
     const hit = resolve(raw);
 
     if (t === reader) {
-      if (!hit && /^(AAAAA|BBBBB)$/i.test(raw)) return;
+      if (!hit && /^(A{5,6}|B{5,6})$/i.test(raw)) return;
       if (!(hit && hit.student) && S.current && S.current.state === 'mismatch') {
         block(e); focusEl(reader, true);
         warn(`還沒確認讀者 ${S.current.st.name}，請重新輸入胸號`);
@@ -170,12 +172,12 @@
       }
       if (!hit) {                                   // 名單外：照常交給系統
         if (/^[a-z]\d{9}$/.test(raw)) setValue(reader, raw.toUpperCase());
-        S.current = null; renderPanel();
+        S.current = null; S.ctx = 'borrow'; renderPanel();
         showMsg('名單外的號碼，已交給系統', 'info', 2500);
         return;
       }
       if (hit.error && raw.length <= 2) { block(e); warn(hit.error); focusEl(reader); return; }
-      if (hit.error) { S.current = null; showMsg(`名單內查無 ${raw}，已照原號碼交給系統`, 'info', 3000); return; }
+      if (hit.error) { S.current = null; S.ctx = 'borrow'; showMsg(`名單內查無 ${raw}，已照原號碼交給系統`, 'info', 3000); return; }
       const id = readerId(hit.student);
       if (!id) { block(e); warn(`${hit.student.name} 沒有${idLabel()}資料`); return; }
       if (raw !== id) setValue(reader, id);
@@ -199,24 +201,52 @@
     if (hit && hit.error && raw.length <= 2) { block(e); warn(hit.error); focusEl(book, true); return; }
 
     // 一般書號
-    if (/^\d{3,}$/.test(raw) || /^[A-Z0-9]{5,}$/i.test(raw) && raw !== 'AAAAA' && raw !== 'BBBBB') {
+    if (/^\d{3,}$/.test(raw) || /^[A-Z0-9]{5,}$/i.test(raw) && !/^(A{5,6}|B{5,6})$/i.test(raw)) {
       if (S.current && S.current.state === 'mismatch') {
         block(e); setValue(book, '');
         warn(`系統上的讀者不是 ${S.current.st.name}，這本書沒有借出`);
         return;
       }
-      if (/^\d{3,}$/.test(raw) && !(hit && hit.student)) rememberBookLen(raw.length);
       const before = resultLine();
       setTimeout(() => checkScanResult(before, raw), 700);
     }
   }
 
-  function block(e) { e.preventDefault(); e.stopImmediatePropagation(); }
+  function block(e) {
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.type === 'keydown') S.swallow.add(e.code || e.key);
+  }
+  // 系統（AngularJS ng-keyup）在 keyup 才處理 Enter：被攔下的按鍵，keypress / keyup 也要一起攔
+  const eatUp = (e) => {
+    if (!e.isTrusted) return;
+    const k = e.code || e.key;
+    if (!S.swallow.has(k)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.type === 'keyup') S.swallow.delete(k);
+  };
+  document.addEventListener('keypress', eatUp, true);
+  document.addEventListener('keyup', eatUp, true);
+
+  // 游標位置決定大字區：讀者欄＝先隱藏等待；書籍欄（且這一輪沒輸入讀者）＝還書中
+  document.addEventListener('focusin', (e) => {
+    const { reader, book } = inputs();
+    if (!reader) return;
+    if (e.target === reader) {
+      if (S.ctx !== 'idle') { S.ctx = 'idle'; S.ret = null; renderBig(); }
+    } else if (e.target === book) {
+      if (S.ctx === 'idle') { S.ctx = 'return'; S.current = null; renderPanel(); renderBig(); }
+    }
+  }, true);
 
   function doAction(act) {
     const { book } = inputs();
     if (act === 'next') { nextReader(); speak('下一位', false, 'sayNextKey'); }
-    else if (act === 'book') { focusEl(book, true); speak('還書', false, 'sayBookKey'); }
+    else if (act === 'book') {
+      S.ctx = 'return'; S.ret = null;
+      if (S.current && S.current.state !== 'mismatch') S.current = null;
+      focusEl(book, true); renderPanel(); renderBig();
+      speak('還書', false, 'sayBookKey');
+    }
     else if (act === 'recess') toggleRecess();
     else if (act === 'pickClass') { nextReader(); S.picking = ''; renderBig(); speak('請輸入班級', false, 'sayModeSwitch'); }
   }
@@ -253,7 +283,7 @@
   function rememberBookLen(n) {
     if (S.bookLens.has(n)) return;
     S.bookLens.add(n);
-    chrome.storage.local.set({ bookLens: [...S.bookLens] });
+    chrome.storage.local.set({ bookLens2: [...S.bookLens] });
   }
 
   function nextReader() {
@@ -272,13 +302,15 @@
   }
   function checkScanResult(before, bookNo) {
     const line = resultLine();
-    const m = line.match(/^\s*(.*?)\s*已歸還\s*排架號\s*(\S+)/);
+    if (line !== before && /已借出|已歸還/.test(line) && /^\d{3,}$/.test(bookNo || '')) rememberBookLen(bookNo.length);
+    const m = line.match(/^\s*(.*?)\s*已歸還\s*(?:排架號\s*(\S+))?/);
     if (m && line !== before) {
       clearInterval(S.pollTimer);
       S.current = null;
       // 系統訊息的書名太長會被截斷，優先用下方清單裡同一個登錄號的完整書名
       const title = rowTitle(bookNo) || m[1].trim().replace(/\.{3}$|…$/, '');
-      S.ret = { title, shelf: m[2] };
+      S.ret = { title, shelf: m[2] || '' };
+      S.ctx = 'return';
       renderPanel(); renderBig();
       speak(`已歸還，${title}`, false, 'sayReturn');            // 不排隊：連續快速還書時直接打斷上一句
       return;
@@ -295,6 +327,7 @@
 
   function startReader(st, via) {
     S.ret = null;
+    S.ctx = 'borrow';
     S.current = { st, via, state: 'pending', pageName: '', quota: null, overdue: null };
     S.msg = null;
     renderPanel(); renderBig();
@@ -497,7 +530,7 @@
     $('mode').textContent = c ? `班級模式：${c.label}，輸入座號 1～${Math.max(...S.byClass.get(c.key).keys())}`
                               : '下課模式：輸入胸號或掃學生條碼';
     $('info').textContent = S.students.length
-      ? `名單 ${S.students.length} 人・證號用${idLabel()}` : '⚠ 尚未匯入名單';
+      ? `名單 ${S.students.length} 人・證號用${idLabel()}・v${chrome.runtime.getManifest?.().version || ''}` : '⚠ 尚未匯入名單';
 
     const el = $('cur');
     if (!S.current) {
@@ -533,6 +566,7 @@
         .b.pick{background:#1d5f8f;color:#fff}
         .b.info{background:#eef6fb;color:#1d5f8f;border:2px solid #9bc3df}
         .rt{color:#5a3fd0}
+        .b.retmode{background:#fff200;color:#5a3fd0;border:4px solid #e0c800;letter-spacing:.3em}
         span{display:inline-block}
       </style><div class="b idle" id="b"><span id="t"></span></div>`;
       document.documentElement.appendChild(bigHost);
@@ -546,30 +580,22 @@
   function renderBig() {
     if (!bigRoot) return;
     const b = bigRoot.getElementById('b'), t = bigRoot.getElementById('t');
-    let cls = 'idle', text;
-    if (S.picking != null) { cls = 'pick'; text = `選班級：${S.picking || '＿'}`; }
-    else if (S.msg && S.msg.kind === 'warn') { cls = 'bad'; text = S.msg.text; }
+    let cls = 'idle', text = '', show = false;
+    const st = S.settings;
+    if (S.picking != null) { cls = 'pick'; text = `選班級：${S.picking || '＿'}`; show = true; }
+    else if (S.msg && S.msg.kind === 'warn') { cls = 'bad'; text = S.msg.text; show = st.showWarnBig; }
     else if (S.current && S.current.state === 'mismatch') {
-      cls = 'bad'; text = `⚠ 系統是「${S.current.pageName || '無讀者'}」不是 ${S.current.st.name}`;
-    } else if (S.current) { cls = S.current.state === 'ok' ? 'ok' : 'pending'; text = bigText(S.current.st); }
-    else if (S.ret) { cls = 'ok'; text = null; }
-    else if (S.msg) { cls = 'info'; text = S.msg.text; }
-    else {
-      const c = S.classes.find((x) => x.key === S.classMode);
-      text = (S.workMode === 'mixed' ? '借還書｜' : '連續借書｜') + (c ? `${c.label}：請輸入座號` : '下課模式：請輸入胸號');
-    }
+      cls = 'bad'; text = `⚠ 系統是「${S.current.pageName || '無讀者'}」不是 ${S.current.st.name}`; show = st.showWarnBig;
+    } else if (S.ctx === 'borrow' && S.current) {
+      cls = S.current.state === 'ok' ? 'ok' : 'pending'; text = bigText(S.current.st); show = st.showReaderBig && st.bigFormat !== 'off';
+    } else if (S.ctx === 'return' && S.ret) { cls = 'ok'; text = null; show = st.showReturnBig; }
+    else if (S.ctx === 'return') { cls = 'retmode'; text = '還書中'; show = st.showReturnMode; }
+    else if (S.msg && S.ctx !== 'idle') { cls = 'info'; text = S.msg.text; show = true; }
     b.className = 'b ' + cls;
     if (text === null) t.innerHTML = `<span class="rt">【已歸還】</span>${esc(S.ret.title)}`;
     else t.textContent = text;
     b.dataset.idle = cls === 'idle' || cls === 'info' ? '1' : '';
     b.dataset.wrap = text === null ? '1' : '';
-    // 每一種大字顯示都可在設定頁個別關閉
-    const st = S.settings;
-    const show = cls === 'pick' ? true
-      : cls === 'bad' ? st.showWarnBig
-      : text === null ? st.showReturnBig
-      : S.current ? st.showReaderBig && st.bigFormat !== 'off'
-      : st.showIdleHint;
     b.dataset.off = show ? '' : '1';
     layoutBig();
   }
@@ -577,24 +603,28 @@
   function layoutBig() {
     if (!bigHost || bigHost.style.display === 'none') return;
     const b = bigRoot.getElementById('b');
-    const th = [...document.querySelectorAll('th,td')].find((x) => x.textContent.trim() === '館藏登錄號');
     const visible = (el) => { const r = el && el.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? r : null; };
-    const { reader } = inputs();
-    const tableR = visible(th && th.closest('table'));   // 表格被隱藏時（尚未查讀者）位置是 0，不能拿來定位
-    const table = tableR ? true : null;
-    const anchor = tableR || visible(reader);
+    const { reader, book } = inputs();
+    const th = [...document.querySelectorAll('th,td')].find((x) => x.textContent.trim() === '館藏登錄號');
+    const tableR = visible(th && th.closest('table'));
+    const inR = visible(book) || visible(reader);
     const panel = host?.shadowRoot.querySelector('.p')?.getBoundingClientRect();
-    const left = Math.max(8, anchor ? anchor.left : 8);
-    let right = anchor && table ? anchor.right : window.innerWidth - 8;
-    if (panel && panel.width) right = Math.min(right, panel.left - 12);
-    let top = anchor ? anchor.bottom + 8 : window.innerHeight * 0.6;
+    let left, right, top;
+    if (tableR && tableR.width >= 500 && (!inR || tableR.top > inR.bottom)) {
+      // 系統有顯示讀者與書單：放在書單表格下方
+      left = tableR.left; right = tableR.right; top = tableR.bottom + 8;
+    } else if (inR) {
+      // 沒有讀者（表格隱藏）：放在兩個輸入欄下方，用整個內容區寬度
+      left = Math.max(8, inR.left - 140); right = window.innerWidth - 16; top = inR.bottom + 40;
+    }
+    if (panel && panel.width && right != null) right = Math.min(right, panel.left - 12);
     const bottom = window.innerHeight - 8;
-    if (bottom - top < 120) top = bottom - 120;
+    if (top != null && bottom - top < 140) top = bottom - 140;
     const W = right - left, H = bottom - top;
-    // 版面算不出合理空間（太窄或找不到欄位）時乾脆不顯示，避免出現左邊直立的怪框
-    const bad = !anchor || W < 320 || H < 80;
+    // 算不出像樣的空間（找不到欄位、太窄）就不顯示，避免出現直立的怪框
+    const bad = !inR || !(W >= 480) || !(H >= 100);
     b.style.visibility = bad || b.dataset.off ? 'hidden' : 'visible';
-    Object.assign(b.style, { left: left + 'px', top: top + 'px', width: Math.max(320, W) + 'px', height: Math.max(80, H) + 'px' });
+    if (!bad) Object.assign(b.style, { left: left + 'px', top: top + 'px', width: W + 'px', height: H + 'px' });
     fitBig();
   }
 

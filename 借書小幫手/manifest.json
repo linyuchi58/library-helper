@@ -1,28 +1,47 @@
 {
   "manifest_version": 3,
   "name": "借書小幫手",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "全國閱讀推動與圖書管理系統借還書輔助：輸入胸號／座號自動帶入借書證號、唸出姓名、自動切換欄位。",
-  "permissions": ["storage", "tts"],
+  "permissions": [
+    "storage",
+    "tts"
+  ],
   "host_permissions": [
     "https://read.k12ea.gov.tw/*",
     "https://script.google.com/*",
     "https://script.googleusercontent.com/*"
   ],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js"
+  },
   "options_page": "options.html",
-  "action": { "default_title": "借書小幫手：名單與設定" },
-  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "借書小幫手：名單與設定"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "content_scripts": [
     {
-      "matches": ["https://read.k12ea.gov.tw/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://read.k12ea.gov.tw/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "all_frames": true,
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://read.k12ea.gov.tw/*"],
-      "js": ["page-helper.js"],
+      "matches": [
+        "https://read.k12ea.gov.tw/*"
+      ],
+      "js": [
+        "page-helper.js"
+      ],
       "all_frames": true,
       "run_at": "document_idle",
       "world": "MAIN"

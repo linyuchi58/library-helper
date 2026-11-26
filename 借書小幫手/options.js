@@ -225,7 +225,7 @@ $('up').onclick = async () => {
 };
 
 // ---------- 設定 ----------
-const FIELDS = ['readerIdType', 'bigFormat', 'showReaderBig', 'showReturnBig', 'showWarnBig', 'showIdleHint', 'showOverdue', 'showQuota',
+const FIELDS = ['readerIdType', 'bigFormat', 'showReaderBig', 'showReturnBig', 'showWarnBig', 'showReturnMode', 'showOverdue', 'showQuota',
   'speakMode', 'speakRate', 'sayName', 'sayReturn', 'sayBookKey', 'sayNextKey', 'sayBorrowKey', 'sayFull', 'sayOverdue', 'sayModeSwitch', 'sayWarn',
   'acceptClassSeat', 'cloudUrl', 'cloudToken', 'autoSyncHours', 'importRule', 'customTpl'];
 async function getSettings() {

@@ -6,7 +6,7 @@ const DEFAULT_SETTINGS = {
   bigFormat: 'short',
   showReaderBig: true,      // 大字顯示讀者班級＋姓名
   showWarnBig: true,        // 大字顯示錯誤／讀者不符（紅底）
-  showIdleHint: true,       // 等待時顯示提示文字
+  showReturnMode: true,     // 游標在書籍欄且沒輸入讀者時顯示「還書中」
   showOverdue: true,        // 預約記錄下方：逾期書名紅框
   showQuota: true,          // 預約記錄下方：還可借 N 本       // 大字區：short＝5甲王小明；long＝5年甲班王小明；off＝不顯示
   speakMode: 'name',        // name：只唸姓名；class：唸班級座號＋姓名
